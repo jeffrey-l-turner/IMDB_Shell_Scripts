@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # imdb-get gets current IMDB.COM data for a given studio with optional date range
 # Copyright (c) 2012 InterStream LLC All Rights Reserved.
 # outputs to stdout by default or filename as option 
@@ -59,8 +59,8 @@
 #
 #########################################################
 
-declare -i CUR_YEAR=`date | cut -d' ' -f6`
-declare -i DATE_START=1915
+CUR_YEAR=`date | cut -d' ' -f6`
+DATE_START=1915
 DATE=`date +%m%d%Y%s`
 CUR_DIR=`dirname $0`
 TMPFOLDER=/tmp
@@ -70,9 +70,9 @@ QUIET=""
 STRIP="1"
 
 # command line options:
-declare -i s=0
-declare -i d=0
-declare -i a=0
+s=0
+d=0
+a=0
 o='/' 
 QUERYDATE="$DATE_START,$CUR_YEAR"
  
@@ -156,8 +156,8 @@ fi
 
 # Check to make sure date range is set properly
 if [ "$d" -eq 1 ]; then
-	declare -i DATE1=`echo $QUERYDATE | sed "s/,/ /" | cut -d' ' -f 1`
-	declare -i DATE2=`echo $QUERYDATE | sed "s/,/ /" | cut -d' ' -f 2`
+	DATE1=`echo $QUERYDATE | sed "s/,/ /" | cut -d' ' -f 1`
+	DATE2=`echo $QUERYDATE | sed "s/,/ /" | cut -d' ' -f 2`
 	echo "Checking Date Range..."
 	echo "Date1 = $DATE1; Date2 =  $DATE2"
 
@@ -195,7 +195,7 @@ curl $QUIET -L -o "$TMPFILE" "$CANONIMDBURL$STUDIO&release_date=$QUERYDATE&view=
 set -o errexit
 
 # Parse number of items from returned HTML and assign from 2nd to last line to environment variable $ITEMS
-cat "$TMPFILE" | awk '/Most Popular/ , /title/' | sed 's/<[^>]*>//g' | tail +11 > "$TMPFILE.items" 
+cat "$TMPFILE" | awk '/Most Popular/ , /title/' | sed 's/<[^>]*>//g' | sed '1,11d' > "$TMPFILE.items" 
 
 	# Parse ITEMSTR by grepping second to last line of file; if no of then take individual from file
 	ITEMSTR=`fgrep of "$TMPFILE.items" | cut -d " " -f 3`
@@ -215,10 +215,10 @@ ITEMS=`echo $ITEMSTR | sed s/,//g`
 
 # Do a sanity check...
 if [ $ITEMS -ge $MAX ]; then
-	echo "Found $ITEMS in IMDB Database for query"
-	echo "Too many items to process... aborting"
-	echo "This is most likely caused by a bad IMDB database query"
-	echo "Check your studio name or IMDB company code carefully!"
+	echo "Found $ITEMS in IMDB Database for query" 1>&2
+	echo "Too many items to process... aborting" 1>&2
+	echo "This is most likely caused by a bad IMDB database query using an invalid studio or company code" 1>&2
+	echo "Check your studio name or IMDB company code carefully!" 1>&2
 	cleanup
 	usage
 fi
@@ -227,7 +227,7 @@ fi
 # Begin parsing data and create additional temporary file from existing HTML temporary file; append to file with additional data
 # Awk to get data between header "results and the table identifier signifying end of results; strip HTML using sed, then cut off first 11 lines
 
-cat "$TMPFILE" | awk '/<table class="results">/ , /<\/table>/' | sed 's/<[^>]*>//g' | tail +11 > "$TMPFILE.tmp" 
+awk '/<table class="results">/ , /<\/table>/' "$TMPFILE" | sed 's/<[^>]*>//g' | sed '1,11d'  > "$TMPFILE.tmp" 
 
 # Process # of $ITEMS in while loop and append to .tmp file
 
@@ -239,7 +239,7 @@ do
 		set +e
 		curl $QUIET -L -o "$TMPFILE" "$CANONIMDBURL$STUDIO&release_date=$QUERYDATE&start=$CURITEM&view=simple" || error;
 		set -o errexit
-		cat "$TMPFILE" | awk '/<table class="results">/ , /<\/table>/' | sed 's/<[^>]*>//g' | tail +11 >> "$TMPFILE.tmp" 
+		awk '/<table class="results">/ , /<\/table>/' "$TMPFILE" | sed 's/<[^>]*>//g' | sed '1,11d' >> "$TMPFILE.tmp" 
 		CURITEM=`expr $CURITEM + 100`
 done
 fi
@@ -251,11 +251,11 @@ fi
 # Test for "raw" output
 # Remove extraeneous information -- ratings, individual dashes (-) etc by printing up to first newline after item number designator and then format with sed for control characters
 if [ "$STRIP" -eq 1 ]; then
-	awk 'BEGIN {ORS="\n";OFS="\t";x="0"} /^[0-9]*\.$/ {print"\n";print;x=1;next} /^.*[:graph:]*$/ {if(x)print} /^$/ {x="";next}' $TMPFILE.tmp | sed -e "s/&#x27;/`echo "\047"`/g" -e 's/&#x26;/\&/g' -e 's/&#xF3;/o/g'   > $TMPFILE.tmp-proc
+	awk --compat 'BEGIN {RS="\n";FS="^[0-9]*\056$";ORS="";OFS ="\t"} /^[0-9]*\056$/ {print "\n";print; print "\t";next} /^.*$/ {print} /^$/ {print "\t";next}' "$TMPFILE.tmp" | cut --fields=1-3 | sed -e "s/&#x27;/`echo "\047"`/g" -e 's/&#x26;/\&/g' -e 's/&#xF3;/o/g'   > "$TMPFILE.tmp-proc"
 
 	# Strip leading item identifiers if we have -a
 if [ "$a" -eq 1 ]; then
-	awk 'BEGIN {RS="\n\n";FS="^[0-9]*\.$";ORS="";OFS ="\t";x="0"} /^[0-9]*\.$/ {print"\n";x=1;next} /^.*[:graph:]*$/ {if(x)print} /^$/ {x="";next}' "$TMPFILE.tmp-proc" > "$TMPFILE.tmp"
+	cut --field=2- "$TMPFILE.tmp-proc" > "$TMPFILE.tmp"
 else
 	mv "$TMPFILE.tmp-proc" "$TMPFILE.tmp"
 fi
@@ -275,6 +275,7 @@ if [ "$a" -eq 1 ]; then
 	cat "$TMPFILE.tmp" >> "$o"
 else
 	mv -i "$TMPFILE.tmp" "$o"
+	echo
 fi
 
 fi
