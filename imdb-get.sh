@@ -10,6 +10,7 @@
 #   Programs:
 #	curl
 #	getopt
+#	echo
 #	date
 #	awk
 #	sed
@@ -21,6 +22,7 @@
 #	mv
 #	wc
 #	cat
+#	touch
 #########################################################
 
 #########################################################
@@ -56,6 +58,9 @@
 # TMPFILE      - Location & Name of Temp File
 # MAX	      - Maximum number of entries to process
 # QUIET	      - Sets stderr option on curl for quiet mode
+# STRIP	      - Identifies whether to remove extraneous information
+# MULTIPASS     - Second Studio identifier; needed for Lionsgate and some others
+# LASTPASS     - Test condition for until loop if multiple passes are required
 #
 #########################################################
 
@@ -68,6 +73,7 @@ CANONIMDBURL='http://www.imdb.com/search/title?&companies='
 MAX=20000
 QUIET=""
 STRIP="1"
+LASTPASS="FALSE" 
 
 # command line options:
 s=0
@@ -83,6 +89,7 @@ QUERYDATE="$DATE_START,$CUR_YEAR"
 usage() {
  	echo `basename $0`: ERROR: $* 1>&2
  	echo usage: `basename $0` '[-h] [-q] [-r] [-a] -s studio [-d date_range ] [-o file]' 1>&2
+	liststudios
  	echo 'where: date_range is two years separated by a single comma and of the form YYYY,YYYY' 1>&2
  	echo 'using quiet mode, -q, will overwrite existing files specified by -o without warning & suppress progress information.' 1>&2
  	echo 'using raw mode, -r, will output without stripping extraneous data.' 1>&2
@@ -91,8 +98,15 @@ usage() {
 }
  
 cleanup() {
- 	rm -f "$TMPFILE.items" "$TMPFILE" "$TMPFILE.tmp" "$TMPFILE.tmp-proc" 
+ 	rm -f "$TMPFILE"*
 }
+
+liststudios() {
+	echo "note: Studio should be one of warner, fox, pbs, lionsgate, universal, sony, dreamworks, disney, paramount, own, nbcu, natgeo, cbs, lucas, ufc, hdnet, aetv, mgm, and lfp." 1>&2
+	echo "note: If studio does not match one of the above, the company id will be used in the query to IMDB. The format should be coXXXXXX, where Xs are numbers." 1>&2
+	echo 'Multiple company ids may be submitted using the format coXXXXXX,coXXXXXX,END where Xs are numbers. "END" specifies the end of the multiple identifier list' 1>&2
+}
+ 
  
 error() {
  	cleanup
@@ -149,8 +163,6 @@ fi
 # Check to make sure -s option is set
 if [ "$s" != 1 ]; then
 	echo "-s option must be set" 1>&2
-	echo "note: Studio should be one of warner, fox, pbs, lionsgate, universal, sony, dreamworks, disney, paramount, own, natgeo, cbs, lucas, ufc, hdnet, aetv, or mgm." 1>&2
-	echo "note: If studio does not match one of the above, the company id will be used in the query to IMDB. The format should be coXXXXXX, where Xs are numbers." 1>&2
 	usage;
 fi
 
@@ -172,24 +184,46 @@ fi
 
 # Some studios and production companies are "special cases"; can add production or distribution company codes here by looking at URL format from IMDB
 case "$STUDIO" in
-	sony) STUDIO="columbia";;     # Sony is formerly Columbia; IMDB uses that designation
-	cbs) STUDIO="co0274041";;
-        lucas) STUDIO="co0071326";;
-        ufc) STUDIO="co0147548";;
-	lionsgate) STUDIO="co0026995";;
-	hdnet) STUDIO="co0094788";;
-	own) STUDIO="co0229287";;
-	natgeo) STUDIO="co0139461";;
-	aetv) STUDIO="co0056790";;
-	pbs) STUDIO="co0039462";;
+	sony) STUDIO="columbia,END";;     # Sony is formerly Columbia; IMDB uses that designation
+	cbs) STUDIO="co0274041,END";;
+        lucas) STUDIO="co0071326,END";;
+        ufc) STUDIO="co0147548,END";;
+	lionsgate) STUDIO="co0026995,co0179392,END";; 
+	hdnet) STUDIO="co0094788,END";;
+	own) STUDIO="co0229287,END";;
+	nbcu) STUDIO="co0095173,co0022762,co0005073,co0022548,END";;
+	natgeo) STUDIO="co0139461,END";;
+	aetv) STUDIO="co0056790,END";;
+	pbs) STUDIO="co0039462,END";;
+	lfp) STUDIO="co0035870,co0042788,co0044807,END";;
 esac
 
+MULTIPASS=`echo $STUDIO | cut -d ',' -f 2-`
+if [ "$MULTIPASS" == "END" ]; then
+	MULTIPASS="FALSE"
+else
+if [ "$MULTIPASS" == "$STUDIO" ]; then
+		MULTIPASS="END"	
+else
+		MULTIPASS=`echo $STUDIO | cut -d ',' -f 2-`
+fi
+fi
+
+STUDIO=`echo $STUDIO | cut -d ',' -f1`
+
 # Set tmp file using unique identifier from date/time, current PID and studio
-TMPFILE="$TMPFOLDER/imdb-get-$$-$STUDIO.$DATE"
+TMPFILE="$TMPFOLDER/`basename $0`-$$-$STUDIO.$DATE"
+touch "$TMPFILE.tmp"     # create .tmp file to append to in awk/sed scripts below
+
+
+# Use until loop for multiple passes if IMDB has more than one studio identifier
+until [ "$LASTPASS" == "TRUE" ] 
+do
 
 if [ "$QUIET" != "-s" ]; then
 	echo "IMDB Studio Identifier is $STUDIO"
 fi
+
 
 # Get initial data from IMDB for first 100 entries
 set +e
@@ -199,8 +233,8 @@ set -o errexit
 # Parse number of items from returned HTML and assign from 2nd to last line to environment variable $ITEMS
 cat "$TMPFILE" | awk '/Most Popular/ , /title/' | sed 's/<[^>]*>//g' | sed '1,11d' > "$TMPFILE.items" 
 
-	# Parse ITEMSTR by grepping second to last line of file; if no of then take individual from file
-	ITEMSTR=`fgrep of "$TMPFILE.items" | cut -d " " -f 3`
+# Parse ITEMSTR by grepping second to last line of file; if no of then take individual from file
+ITEMSTR=`fgrep of "$TMPFILE.items" | cut -d " " -f 3`
 if [ "$ITEMSTR" = "" ]; then
 	ITEMSTR=`tail -2 "$TMPFILE.items" | paste -s -d '\t' - | cut -f1`
 fi
@@ -228,8 +262,7 @@ fi
 
 # Begin parsing data and create additional temporary file from existing HTML temporary file; append to file with additional data
 # Awk to get data between header "results and the table identifier signifying end of results; strip HTML using sed, then cut off first 11 lines
-
-awk '/<table class="results">/ , /<\/table>/' "$TMPFILE" | sed 's/<[^>]*>//g' | sed '1,11d'  > "$TMPFILE.tmp" 
+awk '/<table class="results">/ , /<\/table>/' "$TMPFILE" | sed 's/<[^>]*>//g' | sed '1,11d'  >> "$TMPFILE.tmp" 
 
 # Process # of $ITEMS in while loop and append to .tmp file
 
@@ -249,6 +282,27 @@ fi
 if [ "$QUIET" = "" ]; then
 	echo "$ITEMS entries processed"
 fi
+
+# Set LASTPASS to TRUE if only one studio identifier is used or finished parsing through list of studos, else parse through list of studios and rexecute loop 
+if [ "$MULTIPASS" == "FALSE" ] ||  [ "$MULTIPASS" == "END" ]; then
+	LASTPASS="TRUE"
+else
+	STUDIO=`echo $MULTIPASS | cut -d ',' -f 1`
+	MULTIPASS=`echo $MULTIPASS | cut -d ',' -f 2-`
+	OLDTMPFILE="$TMPFILE"
+	TMPFILE="$TMPFOLDER/`basename $0`-$$-$STUDIO.$DATE"
+	if [ "$TMPFILE" == "$OLDTMPFILE" ]; then 	# This condition should never be true, identify error and exit
+		echo "shuting down... internal error, TMPFILE variable not set properly" 1>&2	
+		error
+	else
+		mv $OLDTMPFILE.tmp $TMPFILE.tmp
+		rm  "$OLDTMPFILE"*      # Remove old tmp files if doing multiple passes 
+	fi
+fi
+
+
+# End of until loop
+done
 
 # Test for "raw" output
 # Remove extraeneous information -- ratings, individual dashes (-) etc by printing up to first newline after item number designator and then format with sed for control characters
@@ -279,7 +333,6 @@ else
 	mv -i "$TMPFILE.tmp" "$o"
 	echo
 fi
-
 fi
 fi
 
@@ -288,6 +341,3 @@ cleanup
 
 exit 0
 
-# These are some useful pipelines I may want to use...
-#  sed -e '$!N; /^\(.*\)\n\1$/!P; D' -e 's/^[ \t]*//' -e 's/^-//g' -e 's/[1-9]\.[0-9]\/10//g' -e "s/&#x27;/`echo "\047"`/g" -e 's/&#x26;/\&/g' -e 's/&#xF3;/o/g' $TMPFILE.tmp 
-#   | awk '/^$/ {x="";getline;next} {if(x)print x;x=$0} END{if(x)print x}' > $TMPFILE.tmp-proc
