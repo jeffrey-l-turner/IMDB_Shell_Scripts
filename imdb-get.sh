@@ -59,7 +59,7 @@
 #
 #########################################################
 
-CUR_YEAR=`date | cut -d' ' -f6`
+CUR_YEAR=`date | cut -d' ' -f7`
 DATE_START=1915
 DATE=`date +%m%d%Y%s`
 CUR_DIR=`dirname $0`
@@ -158,8 +158,10 @@ fi
 if [ "$d" -eq 1 ]; then
 	DATE1=`echo $QUERYDATE | sed "s/,/ /" | cut -d' ' -f 1`
 	DATE2=`echo $QUERYDATE | sed "s/,/ /" | cut -d' ' -f 2`
+if [ "$QUIET" != "-s" ]; then
 	echo "Checking Date Range..."
 	echo "Date1 = $DATE1; Date2 =  $DATE2"
+fi
 
 if [ "$DATE2" -gt "$CUR_YEAR" ] || [ "$DATE1" -lt "$DATE_START" ] || [ "$DATE2" -lt "$DATE1" ]; then 
 	echo "Date range improperly set - must of of the form YYYY,YYYY where first year is not earlier than $DATE_START, and second year not later than $CUR_YEAR" 1>&2
@@ -251,7 +253,7 @@ fi
 # Test for "raw" output
 # Remove extraeneous information -- ratings, individual dashes (-) etc by printing up to first newline after item number designator and then format with sed for control characters
 if [ "$STRIP" -eq 1 ]; then
-	awk --compat 'BEGIN {RS="\n";FS="^[0-9]*\056$";ORS="";OFS ="\t"} /^[0-9]*\056$/ {print "\n";print; print "\t";next} /^.*$/ {print} /^$/ {print "\t";next}' "$TMPFILE.tmp" | cut --fields=1-3 | sed -e "s/&#x27;/`echo "\047"`/g" -e 's/&#x26;/\&/g' -e 's/&#xF3;/o/g'   > "$TMPFILE.tmp-proc"
+	awk --compat 'BEGIN {RS="\n";FS="^[0-9]*\056$";ORS="";OFS ="\t"} /^[0-9]*\056$/ {print "\n";print; print "\t";next} /^.*$/ {print} /^$/ {print "\t";next}' "$TMPFILE.tmp" | cut --fields=1-3 | sed -e "s/&#x27;/`echo "\047"`/g" -e 's/&#x26;/\&/g' -e 's/&#xF3;/o/g'   -e 's/&#x27;47//g'   > "$TMPFILE.tmp-proc"
 
 	# Strip leading item identifiers if we have -a
 if [ "$a" -eq 1 ]; then
