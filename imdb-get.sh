@@ -307,11 +307,11 @@ done
 # Test for "raw" output
 # Remove extraeneous information -- ratings, individual dashes (-) etc by printing up to first newline after item number designator and then format with sed for control characters
 if [ "$STRIP" -eq 1 ]; then
-	awk --compat 'BEGIN {RS="\n";FS="^[0-9]*\056$";ORS="";OFS ="\t"} /^[0-9]*\056$/ {print "\n";print; print "\t";next} /^.*$/ {print} /^$/ {print "\t";next}' "$TMPFILE.tmp" | cut --fields=1-3 | sed -e "s/&#x27;/`echo "\047"`/g" -e 's/&#x26;/\&/g' -e 's/&#xF3;/o/g'   -e 's/&#x27;47//g'   > "$TMPFILE.tmp-proc"
+	awk --compat 'BEGIN {RS="\n";FS="^[0-9]*\056$";ORS="";OFS ="\t"} /^[0-9]*\056$/ {print "\n";print; print "\t";next} /^.*$/ {print} /^$/ {print "\t";next}' "$TMPFILE.tmp" | cut -f 1-3 | sed -e "s/&#x27;/`echo "\047"`/g" -e 's/&#x26;/\&/g' -e 's/&#xF3;/o/g'   -e 's/&#x27;47//g'   > "$TMPFILE.tmp-proc"
 
 	# Strip leading item identifiers if we have -a
 if [ "$a" -eq 1 ]; then
-	cut --field=2- "$TMPFILE.tmp-proc" > "$TMPFILE.tmp"
+	cut -f 2- "$TMPFILE.tmp-proc" > "$TMPFILE.tmp"
 else
 	mv "$TMPFILE.tmp-proc" "$TMPFILE.tmp"
 fi
