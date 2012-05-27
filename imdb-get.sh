@@ -86,6 +86,12 @@ QUERYDATE="$DATE_START,$CUR_YEAR"
 # setup some useful error handling functions
 #########################################################
  
+liststudios() {
+	echo "note: Studio should be one of warner, fox, pbs, lionsgate, universal, sony, dreamworks, disney, paramount, own, nbcu, natgeo, cbs, lucas, ufc, hdnet, aetv, mgm, and lfp." 1>&2
+	echo "note: If studio does not match one of the above, the company id will be used in the query to IMDB. The format should be coXXXXXX, where Xs are numbers." 1>&2
+	echo 'Multiple company ids may be submitted using the format coXXXXXX,coXXXXXX,END where Xs are numbers. "END" specifies the end of the multiple identifier list' 1>&2
+}
+ 
 usage() {
  	echo `basename $0`: ERROR: $* 1>&2
  	echo usage: `basename $0` '[-h] [-q] [-r] [-a] -s studio [-d date_range ] [-o file]' 1>&2
@@ -101,13 +107,6 @@ cleanup() {
  	rm -f "$TMPFILE"*
 }
 
-liststudios() {
-	echo "note: Studio should be one of warner, fox, pbs, lionsgate, universal, sony, dreamworks, disney, paramount, own, nbcu, natgeo, cbs, lucas, ufc, hdnet, aetv, mgm, and lfp." 1>&2
-	echo "note: If studio does not match one of the above, the company id will be used in the query to IMDB. The format should be coXXXXXX, where Xs are numbers." 1>&2
-	echo 'Multiple company ids may be submitted using the format coXXXXXX,coXXXXXX,END where Xs are numbers. "END" specifies the end of the multiple identifier list' 1>&2
-}
- 
- 
 error() {
  	cleanup
  	echo `basename $0`: ERROR: $* 1>&2
@@ -184,7 +183,7 @@ fi
 
 # Some studios and production companies are "special cases"; can add production or distribution company codes here by looking at URL format from IMDB
 case "$STUDIO" in
-	sony) STUDIO="columbia,END";;     # Sony is formerly Columbia; IMDB uses that designation
+	sony) STUDIO="columbia,co0086397,END";;     # Sony is formerly Columbia; IMDB uses that designation
 	cbs) STUDIO="co0274041,END";;
         lucas) STUDIO="co0071326,END";;
         ufc) STUDIO="co0147548,END";;
