@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # imdb-get gets current IMDB.COM data for a given studio with optional date range
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -80,10 +80,9 @@
 #
 #########################################################
 
-CUR_YEAR=`date | cut -d' ' -f7`
+CUR_YEAR=$(date | cut -d' ' -f7)
 DATE_START=1915
-DATE=`date +%m%d%Y%s`
-CUR_DIR=`dirname $0`
+DATE=$(date +%m%d%Y%s)
 TMPFOLDER=/tmp
 CANONIMDBURL='http://www.imdb.com/search/title?&companies='
 MAX=20000
@@ -108,9 +107,12 @@ liststudios() {
 	echo 'Multiple company ids may be submitted using the format coXXXXXX,coXXXXXX,END where Xs are numbers. "END" specifies the end of the multiple identifier list' 1>&2
 }
  
+# shellcheck disable=SC2120
 usage() {
- 	echo `basename $0`: ERROR: $* 1>&2
- 	echo usage: `basename $0` '[-h] [-q] [-r] [-a] -s studio [-d date_range ] [-o file]' 1>&2
+# shellcheck disable=SC2086
+ 	echo "$(basename $0): ERROR: $*" 1>&2
+# shellcheck disable=SC2086
+ 	echo usage: "$(basename $0)" '[-h] [-q] [-r] [-a] -s studio [-d date_range ] [-o file]' 1>&2
 	liststudios
  	echo 'where: date_range is two years separated by a single comma and of the form YYYY,YYYY' 1>&2
  	echo 'using quiet mode, -q, will overwrite existing files specified by -o without warning & suppress progress information.' 1>&2
@@ -123,16 +125,19 @@ cleanup() {
  	rm -f "$TMPFILE"*
 }
 
+# shellcheck disable=SC2120
 error() {
  	cleanup
- 	echo `basename $0`: ERROR: $* 1>&2
+# shellcheck disable=SC2086
+ 	echo "$(basename $0): ERROR: $*" 1>&2
  	echo "shuting down... internal error or unable to connect to Internet" 1>&2
  	exit 2
 }
 
 interrupt () {
  	cleanup
- 	echo `basename $0`: INTERRUPTED: $* 1>&2
+# shellcheck disable=SC2086
+ 	echo "$(basename $0): INTERRUPTED: $*" 1>&2
  	echo "Cleaning up... removed files" 1>&2
  	exit 2
 }
@@ -144,7 +149,8 @@ trap interrupt INT
 # read command line switches
 #########################################################
 
-set -- `getopt "hqras:d:o:" "$@"` || usage 
+# shellcheck disable=SC2046
+set -- $(getopt "hqras:d:o:" "$@") || usage 
 set -o errexit
 
 
@@ -183,8 +189,8 @@ fi
 
 # Check to make sure date range is set properly
 if [ "$d" -eq 1 ]; then
-	DATE1=`echo $QUERYDATE | sed "s/,/ /" | cut -d' ' -f 1`
-	DATE2=`echo $QUERYDATE | sed "s/,/ /" | cut -d' ' -f 2`
+	DATE1=$(echo "$QUERYDATE" | sed "s/,/ /" | cut -d' ' -f 1)
+	DATE2=$(echo "$QUERYDATE" | sed "s/,/ /" | cut -d' ' -f 2)
 if [ "$QUIET" != "-s" ]; then
 	echo "Checking Date Range..."
 	echo "Date1 = $DATE1; Date2 =  $DATE2"
@@ -281,8 +287,8 @@ awk '/<table class="results">/ , /<\/table>/' "$TMPFILE" | sed 's/<[^>]*>//g' | 
 
 # Process # of $ITEMS in while loop and append to .tmp file
 
-if [ "$ITEMS" '>' 100 ]; then
-	CURITEM=`expr 100 + 1`
+if [ "$ITEMS" -gt 100 ]; then
+	CURITEM=$(expr 100 + 1)
 while [ $CURITEM -le $ITEMS ]
 do
 		rm $TMPFILE
